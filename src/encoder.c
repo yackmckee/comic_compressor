@@ -34,90 +34,104 @@ int default_f(int i) {
 //regions_max = length of region_tracker.
 //regions_top = pointer to an integer indicating the most regions ever used at one time over the course of encoding
 //output_loc = pointer to the triple of bytes that will hold the encoded value
-//last_type = pointer to the type of the region last outputted
+//last_type = the last type outputted
 //f = the function which controls the difference cutoff based on taxicab distance. Must have f(i+1) >= f(i), f(0) = 0, f(127) <= 127
 //
 //return value is a pointer to the output position of the region that was overwritten, or 0 if no region was overwritten.
-unsigned char* encode_next(
+char encode_next(
     unsigned char val,
     unsigned char left_down, unsigned char down, unsigned char right_down, unsigned char right,
     unsigned int x, unsigned int y, 
     struct region* region_tracker, int regions_max, int* regions_top,
     unsigned char* output_loc,
-    char* last_type,
+    char last_type,
     int(*f)(int)) {
   //first, go through the current list of regions and deactivate the ones that need deactivating, and build up the weighted average of the ones that apply to this pixel
+  printf("encoding value %u at (%u,%u)\n",val,x,y);
   int new_index = -1;
   unsigned long avg_numerator = 0;
   unsigned long avg_denominator = 0;
-  for (int i = 9; i < *regions_top; i++) {
+  for (int i = 0; i < *regions_top; i++) {
     int xoffset = x - region_tracker[i].x0;
     int yoffset = y - region_tracker[i].y0; //guaranteed 0 <= yoffset < 65
     if (region_tracker[i].is_active) {
+      //printf("region %u offsets: x = %u, y = %u\n",i,xoffset,yoffset);
       switch(region_tracker[i].type) {
         case 1: {
-                  if (((xoffset >= 0) && (xoffset <= yoffset) && (val - region_tracker[i].color > f(abs(xoffset) + yoffset))) || (yoffset > region_tracker[i].l)) {
-                    region_tracker[i].output_loc[2] = max(yoffset - 1,0) | 0x80;
-                    if (new_index < 0) {
-                      new_index = i;
+                  //check for if we are in the region
+                  if ((xoffset >= 0) && (xoffset <= yoffset)) {
+                    //check for if the region includes this pixel
+                    if ((unsigned char)(val - region_tracker[i].color) > f(abs(xoffset) + yoffset)) {
+                      region_tracker[i].l = yoffset - 1;
+                    //if it does, apply the region
                     } else {
-                      region_tracker[i].is_active = 0;
+                      printf("applying region %u\n",i);
+                      printf("diff = %u, f = %u\n",(unsigned char)(val - region_tracker[i].color),f(abs(xoffset) + yoffset));
+                      avg_numerator += ((unsigned int)region_tracker[i].color)*(128 - f(abs(xoffset) + yoffset));
+                      avg_denominator += 128 - f(abs(xoffset) + yoffset);
                     }
-                  } else if ((xoffset >= 0) && (xoffset <= yoffset)) {
-                    avg_numerator += ((unsigned int)region_tracker[i].color)*(128 - f(abs(xoffset) + yoffset));
-                    avg_denominator += 128 - f(abs(xoffset) + yoffset);
                   }
                   break;
                 }
         case 2: {
-                  if ((xoffset >= yoffset) && (xoffset <= region_tracker[i].l) && (val - region_tracker[i].color > f(abs(xoffset) + yoffset))) {
-                    region_tracker[i].l = abs(xoffset) - 1;
-                  }
-                  if (yoffset > region_tracker[i].l) {
-                    region_tracker[i].output_loc[2] = max(region_tracker[i].l,0) | 0x80;
-                    if (new_index < 0) {
-                      new_index = i;
+                  //check for if we are in the region
+                  if ((xoffset >= yoffset) && (xoffset <= region_tracker[i].l)) {
+                    //check for if the region includes this pixel
+                    if ((unsigned char)(val - region_tracker[i].color) > f(abs(xoffset) + yoffset)) {
+                      region_tracker[i].l = abs(xoffset) - 1;
+                      //if it does, apply the region
                     } else {
-                      region_tracker[i].is_active = 0;
+                      printf("applying region %u\n",i);
+                      printf("diff = %u, f = %u\n",(unsigned char)(val - region_tracker[i].color),f(abs(xoffset) + yoffset));
+                      avg_numerator += ((unsigned int)region_tracker[i].color)*(128 - f(abs(xoffset) + yoffset));
+                      avg_denominator += 128 - f(abs(xoffset) + yoffset);
                     }
-                  } else if ((xoffset >= yoffset) && (xoffset <= region_tracker[i].l)) {
-                    avg_numerator += ((unsigned int)region_tracker[i].color)*(128 - f(abs(xoffset) + yoffset));
-                    avg_denominator += 128 - f(abs(xoffset) + yoffset);
                   }
                   break;
                 }
         case 3: {
-                  if (((xoffset >= -1*yoffset) && (xoffset <= 0) && (val - region_tracker[i].color > f(abs(xoffset) + yoffset))) || (yoffset > region_tracker[i].l)) {
-                    region_tracker[i].output_loc[2] = max(yoffset - 1,0) | 0x80;
-                    if (new_index < 0) {
-                      new_index = i;
+                  //check for if we are in the region
+                  if ((xoffset >= -1*yoffset) && (xoffset <= 0)) {
+                    //check for if the region includes this pixel if ((unsigned char)(val - region_tracker[i].color) > f(abs(xoffset) + yoffset)) { region_tracker[i].l = yoffset - 1;
+                    if ((unsigned char)(val - region_tracker[i].color) > f(abs(xoffset) + yoffset)) {
+                      region_tracker[i].l = abs(xoffset) - 1;
+                    //if it does, apply the region
                     } else {
-                      region_tracker[i].is_active = 0;
+                      printf("applying region %u\n",i);
+                      printf("diff = %u, f = %u\n",(unsigned char)(val - region_tracker[i].color),f(abs(xoffset) + yoffset));
+                      avg_numerator += ((unsigned int)region_tracker[i].color)*(128 - f(abs(xoffset) + yoffset));
+                      avg_denominator += 128 - f(abs(xoffset) + yoffset);
                     }
-                  } else if ((xoffset >= -1*yoffset) && (xoffset <= 0)) {
-                    avg_numerator += ((unsigned int)region_tracker[i].color)*(128 - f(abs(xoffset) + yoffset));
-                    avg_denominator += 128 - f(abs(xoffset) + yoffset);
                   }
                   break;
                 }
         case 4: {
-                  if ((xoffset >= 0) && (xoffset <= region_tracker[i].l - yoffset) && (val - region_tracker[i].color > f(abs(xoffset) + yoffset))) {
-                    region_tracker[i].l = abs(xoffset) - 1 + yoffset;
-                  }
-                  if (yoffset > region_tracker[i].l) {
-                    region_tracker[i].output_loc[2] = max(region_tracker[i].l,0) | 0x80;
-                    if (new_index < 0) {
-                      new_index = i;
+                  //check for if we are in the region
+                  if ((xoffset >= 0) && (xoffset <= region_tracker[i].l - yoffset)) {
+                    //check for if the region includes this pixel
+                    if ((unsigned char)(val - region_tracker[i].color) > f(abs(xoffset) + yoffset)) {
+                      region_tracker[i].l = abs(xoffset) - 1 + yoffset;
                     } else {
-                      region_tracker[i].is_active = 0;
+                      printf("applying region %u\n",i);
+                      printf("diff = %u, f = %u\n",(unsigned char)(val - region_tracker[i].color),f(abs(xoffset) + yoffset));
+                      avg_numerator += ((unsigned int)region_tracker[i].color)*(128 - f(abs(xoffset) + yoffset));
+                      avg_denominator += 128 - f(abs(xoffset) + yoffset);
                     }
-                  } else if ((xoffset >= 0) && (xoffset <= region_tracker[i].l - yoffset)) {
-                    avg_numerator += ((unsigned int)region_tracker[i].color)*(128 - f(abs(xoffset) + yoffset));
-                    avg_denominator += 128 - f(abs(xoffset) + yoffset);
                   }
                   break;
                 }
         default: break; //nonexistent case
+      }
+      //if the region has officially expired
+      if (region_tracker[i].l < yoffset) {
+        //indicate it is completed
+        region_tracker[i].output_loc[2] = max(region_tracker[i].l,0) | 0x80;
+        printf("region %u expired, type is %u, l is %u, color is %u\n",i,region_tracker[i].type,region_tracker[i].l,region_tracker[i].color);
+        if (new_index < 0) {
+          new_index = i;
+        } else {
+          region_tracker[i].is_active = 0;
+        }
       }
     } else if (new_index < 0) {
       new_index = i;
@@ -127,12 +141,9 @@ unsigned char* encode_next(
   if(avg_denominator != 0) {
     c = (unsigned char)(avg_numerator/avg_denominator); //unless there are no regions active, set c to be weighted average of all the applied regions.
   }
-  unsigned char* ret = 0;
   //if we didn't find an empty region struct, increment regions_top
   if (new_index < 0) {
     new_index = (*regions_top)++;
-  } else {
-    ret = region_tracker[new_index].output_loc;
   }
   //start filling up the new region struct
   region_tracker[new_index].is_active = 1;
@@ -150,7 +161,7 @@ unsigned char* encode_next(
 #define test_type3 if ((d_diff <= f(1)) && (ld_diff <= f(2))) { region_tracker[new_index].type = 3; } else
 #define test_type4 if ((r_diff <= f(1)) && (d_diff <= f(1))) { region_tracker[new_index].type = 4; } else
 #define end_tests { region_tracker[new_index].type = 1; }
-  switch ((int)*last_type) {
+  switch (last_type) {
     case 1: {
               test_type2 test_type1 test_type3 test_type4 end_tests
               break;
@@ -175,11 +186,12 @@ unsigned char* encode_next(
   } else if (*regions_top >= 7*regions_max/8) {
     region_tracker[new_index].l = 7;
   } else if (*regions_top >= regions_max - 1) { //we literally only have one region left; leave it deactivated forever and output a 0-length region
+    printf("outputting 1-pixel region\n");
     output_loc[0] = 0;
     output_loc[1] = val - c;
     output_loc[2] = 0x80;
     region_tracker[new_index].is_active = 0; //deactivate the region we were using.
-    return ret;
+    return 0;
   } else {
     region_tracker[new_index].l = 63;
   }
@@ -187,11 +199,12 @@ unsigned char* encode_next(
   region_tracker[new_index].y0 = y;
   region_tracker[new_index].output_loc = output_loc;
   region_tracker[new_index].color = val;
+  printf("new region %u: type = %u, offset = %u, l = %u\n",new_index,region_tracker[new_index].type,(unsigned char)(val-c),region_tracker[new_index].l);
   //output the encoded value to output_loc
   output_loc[0] = region_tracker[new_index].type;
   output_loc[1] = val - c;
   output_loc[2] = 0;
-  return ret;
+  return region_tracker[new_index].type;
 }
 
 //holds a pointer to an array and its size
@@ -256,7 +269,7 @@ void LZW_output(
   }
   //now start outputting
   //expand the output buffer if necessary. We could use up to 2 new bytes.
-  if (*index + 2 >= *output_length) {
+  if (*index + 2 >= *output_length - 1) {
     *output = realloc(*output,(*output_length)*2);
     *output_length *= 2;
   }
@@ -304,7 +317,7 @@ unsigned char* encode_buffer(
     unsigned int* output_len1,
     int TEST) {
   //we need some state to encode the image
-  //memory usage is region_tracker_limit*63 bytes plus a few kilobytes
+  //memory usage is region_tracker_limit*183 bytes plus a few kilobytes
   //it is unclear how this size affects compression efficiency; definitely a thing to test
   //the adversarial example would be a large blob of a single color, which would be compressed significantly by LZW but involves lots of large regions.
   struct region* region_tracker_red = calloc(region_tracker_limit,sizeof(struct region));
@@ -316,7 +329,7 @@ unsigned char* encode_buffer(
   struct region* region_tracker_blue = calloc(region_tracker_limit,sizeof(struct region));
   int region_tracker_blue_top = 0;
   char last_type_blue;
-  unsigned char* LZW_input = calloc(region_tracker_limit*6,1); //we use this as a rolling input buffer. Never fills up completely because only region_tracker_limit regions can be active at a time.
+  unsigned char* LZW_input = calloc(region_tracker_limit*18,1); //we use this as a rolling input buffer. Never fills up completely because only region_tracker_limit regions can be active at a time.
   unsigned int LZW_input_begin = 0;
   unsigned int LZW_input_end = 0;
   unsigned int LZW_input_len = 0;
@@ -337,32 +350,38 @@ unsigned char* encode_buffer(
   //2) add any additional triples that were free'd up into the LZW input
   //3) if there is LZW output, output it.
   for(int y = 0; y < rows; y++) {
+    printf("encoding red values of row %u\n",y);
     for(int x = 0; x < columns; x++) {
-      unsigned char* finished_triple = encode_next(
+      last_type_red = encode_next(
           get_red(x,y),
           get_red(x-1,y+1),get_red(x,y+1),get_red(x+1,y+1),get_red(x+1,y),
           x, y,
           region_tracker_red, region_tracker_limit, &region_tracker_red_top,
           LZW_input+LZW_input_end,
-          &last_type_red,
+          last_type_red,
           f);
       //triples OR the last bit with 0x80 when they are done. We find those and increment input_len as appropriate.
       //LZW_input_begin and LZW_input_len aren't necessary aligned to 3 bytes, but their sum always is
-      while((LZW_input[(LZW_input_begin + LZW_input_len) % (region_tracker_limit*6) + 2] & 0x80) != 0) {
-        LZW_input[(LZW_input_begin + LZW_input_len) % (region_tracker_limit*6) + 2] &= 0x7f;
+      while((LZW_input[(LZW_input_begin + LZW_input_len) % (region_tracker_limit*18) + 2] & 0x80) != 0) {
+        LZW_input[(LZW_input_begin + LZW_input_len) % (region_tracker_limit*18) + 2] &= 0x7f;
         LZW_input_len += 3;
       }
       //if we're testing, don't do LZW compression, just test to see if the initial encoder works
-      if (TEST) {
+      if (TEST && (LZW_input_len > 0)) {
+        printf("reallocating output buffer from size %u to %u\n",output_len,output_len + LZW_input_len + 6);
         if (output_index + LZW_input_len >= output_len) {
-          output = realloc(output,2*output_len);
-          output_len *= 2;
+          output = realloc(output,output_len + LZW_input_len + 6);;
+          output_len += LZW_input_len + 6;
         }
-        memcpy(output + output_index,LZW_input + LZW_input_begin,min(LZW_input_len,region_tracker_limit*6 - LZW_input_begin));
-        if (LZW_input_len > region_tracker_limit*6 - LZW_input_begin) {
-          memcpy(output + output_index + region_tracker_limit*6 - LZW_input_begin,LZW_input,(LZW_input_begin + LZW_input_len) % (region_tracker_limit*6));
+        printf("writing %u bytes to %p\n",min(LZW_input_len,region_tracker_limit*18 - LZW_input_begin),output + output_index);
+        memcpy(output + output_index,LZW_input + LZW_input_begin,min(LZW_input_len,region_tracker_limit*18 - LZW_input_begin));
+        if (LZW_input_len > region_tracker_limit*18 - LZW_input_begin) {
+          printf("writing %u bytes to %p\n",(LZW_input_begin + LZW_input_len) % (region_tracker_limit*18),output + output_index + region_tracker_limit*18 - LZW_input_begin);
+          memcpy(output + output_index + region_tracker_limit*18 - LZW_input_begin,LZW_input,(LZW_input_begin + LZW_input_len) % (region_tracker_limit*18));
         }
-        LZW_input_begin = (LZW_input_begin + LZW_input_len) % (region_tracker_limit*6);
+        LZW_input_begin = (LZW_input_begin + LZW_input_len) % (region_tracker_limit*18);
+        printf("wrote %u bytes\n",LZW_input_len);
+        output_index += LZW_input_len;
         LZW_input_len = 0;
       } else {
       //if we have anything to input, input it until we get a string not in the dict
@@ -372,7 +391,7 @@ unsigned char* encode_buffer(
             LZW_prefix_start, LZW_input[LZW_input_begin]);
         //current string is still in the dict, so increment LZW_input_begin and continue
         if (new_prefix >= 0) {
-          LZW_input_begin = (LZW_input_begin + 1) % (region_tracker_limit*6);
+          LZW_input_begin = (LZW_input_begin + 1) % (region_tracker_limit*18);
           LZW_input_len--;
           LZW_prefix_start = new_prefix;
         } else {
@@ -386,35 +405,41 @@ unsigned char* encode_buffer(
       }
       }
       //increment LZW_input_end to put a new triple in it
-      LZW_input_end = (LZW_input_end + 3) % (region_tracker_limit*6);
+      LZW_input_end = (LZW_input_end + 3) % (region_tracker_limit*18);
     } 
     //copy/paste the above code for green and blue segments
+    printf("encoding green values of row %u\n",y);
     for(int x = 0; x < columns; x++) {
-      unsigned char* finished_triple = encode_next(
+      last_type_green = encode_next(
           get_green(x,y),
           get_green(x-1,y+1),get_green(x,y+1),get_green(x+1,y+1),get_green(x+1,y),
           x, y,
           region_tracker_green, region_tracker_limit, &region_tracker_green_top,
           LZW_input+LZW_input_end,
-          &last_type_green,
+          last_type_green,
           f);
       //triples OR the last bit with 0x80 when they are done. We find those and increment input_len as appropriate.
       //LZW_input_begin and LZW_input_len aren't necessary aligned to 3 bytes, but their sum always is
-      while((LZW_input[(LZW_input_begin + LZW_input_len) % (region_tracker_limit*6) + 2] & 0x80) != 0) {
-        LZW_input[(LZW_input_begin + LZW_input_len) % (region_tracker_limit*6) + 2] &= 0x7f;
+      while((LZW_input[(LZW_input_begin + LZW_input_len) % (region_tracker_limit*18) + 2] & 0x80) != 0) {
+        LZW_input[(LZW_input_begin + LZW_input_len) % (region_tracker_limit*18) + 2] &= 0x7f;
         LZW_input_len += 3;
       }
       //if we're testing, don't do LZW compression, just test to see if the initial encoder works
-      if (TEST) {
+      if (TEST && (LZW_input_len > 0)) {
+        printf("reallocating output buffer from size %u to %u\n",output_len,output_len + LZW_input_len + 6);
         if (output_index + LZW_input_len >= output_len) {
-          output = realloc(output,2*output_len);
-          output_len *= 2;
+          output = realloc(output,output_len + LZW_input_len + 6);;
+          output_len += LZW_input_len + 6;
         }
-        memcpy(output + output_index,LZW_input + LZW_input_begin,min(LZW_input_len,region_tracker_limit*6 - LZW_input_begin));
-        if (LZW_input_len > region_tracker_limit*6 - LZW_input_begin) {
-          memcpy(output + output_index + region_tracker_limit*6 - LZW_input_begin,LZW_input,(LZW_input_begin + LZW_input_len) % (region_tracker_limit*6));
+        printf("writing %u bytes to %p\n",min(LZW_input_len,region_tracker_limit*18 - LZW_input_begin),output + output_index);
+        memcpy(output + output_index,LZW_input + LZW_input_begin,min(LZW_input_len,region_tracker_limit*18 - LZW_input_begin));
+        if (LZW_input_len > region_tracker_limit*18 - LZW_input_begin) {
+          printf("writing %u bytes to %p\n",(LZW_input_begin + LZW_input_len) % (region_tracker_limit*18),output + output_index + region_tracker_limit*18 - LZW_input_begin);
+          memcpy(output + output_index + region_tracker_limit*18 - LZW_input_begin,LZW_input,(LZW_input_begin + LZW_input_len) % (region_tracker_limit*18));
         }
-        LZW_input_begin = (LZW_input_begin + LZW_input_len) % (region_tracker_limit*6);
+        LZW_input_begin = (LZW_input_begin + LZW_input_len) % (region_tracker_limit*18);
+        printf("wrote %u bytes\n",LZW_input_len);
+        output_index += LZW_input_len;
         LZW_input_len = 0;
       } else {
       //if we have anything to input, input it until we get a string not in the dict
@@ -424,7 +449,7 @@ unsigned char* encode_buffer(
             LZW_prefix_start, LZW_input[LZW_input_begin]);
         //current string is still in the dict, so increment LZW_input_begin and continue
         if (new_prefix >= 0) {
-          LZW_input_begin = (LZW_input_begin + 1) % (region_tracker_limit*6);
+          LZW_input_begin = (LZW_input_begin + 1) % (region_tracker_limit*18);
           LZW_input_len--;
           LZW_prefix_start = new_prefix;
         } else {
@@ -438,34 +463,40 @@ unsigned char* encode_buffer(
       }
       }
       //increment LZW_input_end to put a new triple in it
-      LZW_input_end = (LZW_input_end + 3) % (region_tracker_limit*6);
+      LZW_input_end = (LZW_input_end + 3) % (region_tracker_limit*18);
     }
+    printf("encoding blue values of row %u\n",y);
     for(int x = 0; x < columns; x++) {
-      unsigned char* finished_triple = encode_next(
+      last_type_blue = encode_next(
           get_blue(x,y),
           get_blue(x-1,y+1),get_blue(x,y+1),get_blue(x+1,y+1),get_blue(x+1,y),
           x, y,
           region_tracker_blue, region_tracker_limit, &region_tracker_blue_top,
           LZW_input+LZW_input_end,
-          &last_type_blue,
+          last_type_blue,
           f);
       //triples OR the last bit with 0x80 when they are done. We find those and increment input_len as appropriate.
       //LZW_input_begin and LZW_input_len aren't necessary aligned to 3 bytes, but their sum always is
-      while((LZW_input[(LZW_input_begin + LZW_input_len) % (region_tracker_limit*6) + 2] & 0x80) != 0) {
-        LZW_input[(LZW_input_begin + LZW_input_len) % (region_tracker_limit*6) + 2] &= 0x7f;
+      while((LZW_input[(LZW_input_begin + LZW_input_len) % (region_tracker_limit*18) + 2] & 0x80) != 0) {
+        LZW_input[(LZW_input_begin + LZW_input_len) % (region_tracker_limit*18) + 2] &= 0x7f;
         LZW_input_len += 3;
       }
       //if we're testing, don't do LZW compression, just test to see if the initial encoder works
-      if (TEST) {
+      if (TEST && (LZW_input_len > 0)) {
+        printf("reallocating output buffer from size %u to %u\n",output_len,output_len + LZW_input_len + 6);
         if (output_index + LZW_input_len >= output_len) {
-          output = realloc(output,2*output_len);
-          output_len *= 2;
+          output = realloc(output,output_len + LZW_input_len + 6);;
+          output_len += LZW_input_len + 6;
         }
-        memcpy(output + output_index,LZW_input + LZW_input_begin,min(LZW_input_len,region_tracker_limit*6 - LZW_input_begin));
-        if (LZW_input_len > region_tracker_limit*6 - LZW_input_begin) {
-          memcpy(output + output_index + region_tracker_limit*6 - LZW_input_begin,LZW_input,(LZW_input_begin + LZW_input_len) % (region_tracker_limit*6));
+        printf("writing %u bytes to %p\n",min(LZW_input_len,region_tracker_limit*18 - LZW_input_begin),output + output_index);
+        memcpy(output + output_index,LZW_input + LZW_input_begin,min(LZW_input_len,region_tracker_limit*18 - LZW_input_begin));
+        if (LZW_input_len > region_tracker_limit*18 - LZW_input_begin) {
+          printf("writing %u bytes to %p\n",(LZW_input_begin + LZW_input_len) % (region_tracker_limit*18),output + output_index + region_tracker_limit*18 - LZW_input_begin);
+          memcpy(output + output_index + region_tracker_limit*18 - LZW_input_begin,LZW_input,(LZW_input_begin + LZW_input_len) % (region_tracker_limit*18));
         }
-        LZW_input_begin = (LZW_input_begin + LZW_input_len) % (region_tracker_limit*6);
+        LZW_input_begin = (LZW_input_begin + LZW_input_len) % (region_tracker_limit*18);
+        printf("wrote %u bytes\n",LZW_input_len);
+        output_index += LZW_input_len;
         LZW_input_len = 0;
       } else {
       //if we have anything to input, input it until we get a string not in the dict
@@ -475,7 +506,7 @@ unsigned char* encode_buffer(
             LZW_prefix_start, LZW_input[LZW_input_begin]);
         //current string is still in the dict, so increment LZW_input_begin and continue
         if (new_prefix >= 0) {
-          LZW_input_begin = (LZW_input_begin + 1) % (region_tracker_limit*6);
+          LZW_input_begin = (LZW_input_begin + 1) % (region_tracker_limit*18);
           LZW_input_len--;
           LZW_prefix_start = new_prefix;
         } else {
@@ -489,8 +520,57 @@ unsigned char* encode_buffer(
       }
       }
       //increment LZW_input_end to put a new triple in it
-      LZW_input_end = (LZW_input_end + 3) % (region_tracker_limit*6);
+      LZW_input_end = (LZW_input_end + 3) % (region_tracker_limit*18);
     }
+  }
+  //deactivate every still-active region for every color in every row, and output all the resulting output
+  for(int i = 0; i < region_tracker_limit; i++) {
+    if(region_tracker_red[i].is_active) {
+      region_tracker_red[i].output_loc[2] = region_tracker_red[i].l;
+    }
+    if(region_tracker_green[i].is_active) {
+      region_tracker_green[i].output_loc[2] = region_tracker_green[i].l;
+    }
+    if(region_tracker_blue[i].is_active) {
+      region_tracker_blue[i].output_loc[2] = region_tracker_blue[i].l;
+    }
+  }
+  printf("deactivating and finalizing all regions\n");
+  //we now have a guarantee that every triple from LZW_input_begin to LZW_input_end is finished, so we output them
+  //LZW_input_len is inclusive, so we have to be careful
+  LZW_input_len = LZW_input_begin < LZW_input_end ? LZW_input_end - LZW_input_begin : LZW_input_end + region_tracker_limit*18 - LZW_input_begin;
+  if (TEST) {
+    printf("reallocating output buffer from size %u to %u\n",output_len,output_len + LZW_input_len + 6);
+    if (output_index + LZW_input_len >= output_len) {
+      output = realloc(output,output_len + LZW_input_len + 6);;
+      output_len += LZW_input_len + 6;
+    }
+    printf("writing %u bytes to %p\n",min(LZW_input_len,region_tracker_limit*18 - LZW_input_begin),output + output_index);
+    memcpy(output + output_index,LZW_input + LZW_input_begin,min(LZW_input_len,region_tracker_limit*18 - LZW_input_begin));
+    if (LZW_input_len > region_tracker_limit*18 - LZW_input_begin) {
+      printf("writing %u bytes to %p\n",(LZW_input_begin + LZW_input_len) % (region_tracker_limit*18),output + output_index + region_tracker_limit*18 - LZW_input_begin);
+      memcpy(output + output_index + region_tracker_limit*18 - LZW_input_begin,LZW_input,(LZW_input_begin + LZW_input_len) % (region_tracker_limit*18));
+    }
+    printf("wrote %u bytes\n",LZW_input_len);
+  } else {
+  while(LZW_input_len > 0) {
+    int new_prefix = next_prefix_index(
+        LZW_dict, LZW_dict_nextindex,
+        LZW_prefix_start, LZW_input[LZW_input_begin]);
+    //current string is still in the dict, so increment LZW_input_begin and continue
+    if (new_prefix >= 0) {
+      LZW_input_begin = (LZW_input_begin + 1) % (region_tracker_limit*18);
+      LZW_input_len--;
+      LZW_prefix_start = new_prefix;
+    } else {
+      //current prefix + new postfix is not in the dict, so we output the current prefix and to not increment input
+      LZW_output(
+          LZW_prefix_start,LZW_input[LZW_input_begin],
+          &output, &output_index, &output_bitoffset, &output_len, &LZW_index_bitwidth,
+          LZW_dict, &LZW_dict_nextindex, dict_max_len);
+      LZW_prefix_start = -1; //set prefix to be 0-length
+    }
+  }
   }
   //free state
   free(region_tracker_red);
@@ -499,6 +579,7 @@ unsigned char* encode_buffer(
   free(LZW_input);
   free(LZW_dict);
   *output_len1 = output_len;
+  printf("used %d region slots \n",max(max(region_tracker_red_top,region_tracker_green_top),region_tracker_blue_top));
   return output;
 }
 
@@ -507,18 +588,21 @@ unsigned char* encode_buffer(
 //input == "stdin" -> read from stdin
 //output == "stdout" -> output to stdout
 int main(int argc, char** argv) {
+  if(argc < 5) {
+    return 1;
+  }
   int test = 0;
   int rd_stdin = 0;
   int wr_stdout = 0;
-  if (strcmp(argv[1],"test") == 0) {
+  if (strncmp(argv[1],"test",4) == 0) {
     test = 1;
   }
   int width = atoi(argv[1+test]);
   int height = atoi(argv[2+test]);
-  if (strcmp(argv[3+test],"stdin") == 0) {
+  if (strncmp(argv[3+test],"stdin",5) == 0) {
     rd_stdin = 1;
   }
-  if (strcmp(argv[4+test],"stdout") == 0) {
+  if (strncmp(argv[4+test],"stdout",6) == 0) {
     wr_stdout = 1;
   }
   unsigned char* input = malloc(width*height*3);
@@ -533,7 +617,10 @@ int main(int argc, char** argv) {
       &default_f, //also use default f, will be tuneable later
       &output_len,
       test);
+  printf("writing output");
   fwrite(output,1,output_len,wr);
+  fflush(wr);
+  fclose(wr);
   free(input);
   free(output);
   return 0;
