@@ -21,7 +21,7 @@ unsigned char MASK = 0xfe;
 //to decode a value
 int decode_next(struct region* regions, int rowlen, int x, int y, unsigned char v1, unsigned char v2, unsigned char last_color, unsigned char* output, int* output_incr) {
   if (regions[x].is_active) { //if a region covers this location
-    fprintf(stderr,"applying region with color %x at (%d,%d), l = %d, y0 = %d, x0 = %d\n",regions[x].color,x,y,regions[x].l,regions[x].y0,regions[x].x0);
+    //fprintf(stderr,"applying region with color %x at (%d,%d), l = %d, y0 = %d, x0 = %d\n",regions[x].color,x,y,regions[x].l,regions[x].y0,regions[x].x0);
     *output = regions[x].color;
     if (((x - regions[x].x0) == (y - regions[x].y0 - 1)) && (x < rowlen - 1)) {
       regions[x + 1] = regions[x];
@@ -34,10 +34,10 @@ int decode_next(struct region* regions, int rowlen, int x, int y, unsigned char 
   } else { //if a region just expired or there was no active region
     if ((v1 & 0x1) && v2) { //if we are reading a nonzero-length region
       regions[x].is_active = 1;
-      regions[x].l = v2;
+      regions[x].l = v2 & 0x7f;
       regions[x].color = last_color + (v1 & MASK);
       *output = last_color + (v1 & MASK);
-      fprintf(stderr,"last color was %x, offset is %u, at (%d,%d)\n",last_color,v1 & MASK,x,y);
+      //fprintf(stderr,"last color was %x, offset is %u, at (%d,%d)\n",last_color,v1 & MASK,x,y);
       regions[x].y0 = y;
       regions[x].x0 = x;
       *output_incr = 1;
@@ -48,7 +48,7 @@ int decode_next(struct region* regions, int rowlen, int x, int y, unsigned char 
     } else { //if we read a zero-length region
       regions[x].is_active = 0;
       *output = last_color + (v1 & MASK);
-      fprintf(stderr,"last color was %x, offset is %u, at (%d,%d)\n",last_color,v1 & MASK,x,y);
+      //fprintf(stderr,"last color was %x, offset is %u, at (%d,%d)\n",last_color,v1 & MASK,x,y);
       *output_incr = 1;
       return 1;
     }
@@ -149,4 +149,6 @@ int main(int argc,char** argv) {
     out = fopen(argv[2],"w");
   }
   decode_stream(in,out);
+  gzclose(in);
+  fclose(out);
 }

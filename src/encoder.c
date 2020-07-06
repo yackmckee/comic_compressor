@@ -58,14 +58,15 @@ unsigned char* encode_row(struct region* regions, int rowlen, unsigned char* out
       }
       if (i == imax) {
         regions[x].l++;
-        if(regions[i - 1].is_active && (i != x)) {
-          fprintf(stderr,"nonzero-length region at %d, last color was %x, this color = %x, region color = %x, l = %d\n",x,(x > 0 ? row[x - 1] : 0),row[x],regions[i].color,regions[i].l);
+        //fprintf(stderr,"region at %d extended to l = %d, color = %x\n",x,regions[x].l,regions[x].color);
+        if(regions[i - 1].is_active && (x < (i-1))) {
+          //fprintf(stderr,"nonzero-length region at %d, last color was %x, this color = %x, region color = %x, l = %d\n",i-1,(x > 0 ? row[x - 1] : 0),row[x],regions[i-1].color,regions[i-1].l);
           regions[i - 1].is_active = 0;
           *(regions[i - 1].output) = regions[i - 1].l | 0x80;
           avg_area_denom += square(regions[i - 1].l + 1)/2;
           avg_area_num += 2;
           if(regions[i - 1].l == 0) {
-            //fprintf(stderr,"region %d was length zero when it died\n",x);
+            ////fprintf(stderr,"region %d was length zero when it died\n",x);
             num_bad_regions++;
           }
         }
@@ -77,17 +78,17 @@ unsigned char* encode_row(struct region* regions, int rowlen, unsigned char* out
         }
         x = i;
       } else {
-        fprintf(stderr,"nonzero-length region at %d, last color was %x, this color = %x, region color = %x, l = %d\n",x,(x > 0 ? row[x - 1] : 0),row[x],regions[x].color,regions[x].l);
+        //fprintf(stderr,"nonzero-length region at %d, last color was %x, this color = %x, region color = %x, l = %d\n",x,(x > 0 ? row[x - 1] : 0),row[x],regions[x].color,regions[x].l);
         regions[x].is_active = 0;
         *(regions[x].output) = regions[x].l | 0x80;
         avg_area_denom += square(regions[x].l + 1)/2;
         avg_area_num += 2;
         if(regions[x].l == 0) {
-          //fprintf(stderr,"region %d was length zero when it died\n",x);
+          ////fprintf(stderr,"region %d was length zero when it died\n",x);
           num_bad_regions++;
         }
         if((nextrow != 0) && (nextrow[x] == row[x]) && (nextrow[x < rowlen - 1 ? x + 1 : x] == row[x]) && no_active_edge(x,row[x],regions)) {
-          //fprintf(stderr,"new region %d, color %d, color (x,y+1) = %d, color (x+1,y+1) = %d\n",x,row[x],nextrow[x],nextrow[x < rowlen - 1 ? x + 1 : x]);
+          ////fprintf(stderr,"new region %d, color %d, color (x,y+1) = %d, color (x+1,y+1) = %d\n",x,row[x],nextrow[x],nextrow[x < rowlen - 1 ? x + 1 : x]);
           regions[x].is_active = 1;
           regions[x].output = output+1;
           *output = (row[x] - (x > 0 ? row[x-1] : 0)) | 0x1;
@@ -97,7 +98,7 @@ unsigned char* encode_row(struct region* regions, int rowlen, unsigned char* out
           output = output + 2;
         } else {
           *output = row[x] - (x > 0 ? row[x-1] : 0);
-          fprintf(stderr,"zero-length region at %d, last color was %x, this color = %x, offset = %d\n",x,(x > 0 ? row[x - 1] : 0),row[x],*output);
+          //fprintf(stderr,"zero-length region at %d, last color was %x, this color = %x, offset = %d\n",x,(x > 0 ? row[x - 1] : 0),row[x],*output);
           output = output + 1;
           avg_area_num ++;
           avg_area_denom ++;
@@ -106,7 +107,7 @@ unsigned char* encode_row(struct region* regions, int rowlen, unsigned char* out
       }
     } else {
       if ((nextrow != 0) && (nextrow[x] == row[x]) && (nextrow[x < rowlen - 1 ? x + 1 : x] == row[x]) && no_active_edge(x,row[x],regions)) {
-        //fprintf(stderr,"new region %d, color %d, color (x,y+1) = %d, color (x+1,y+1) = %d\n",x,row[x],nextrow[x],nextrow[x < rowlen - 1 ? x + 1 : x]);
+        ////fprintf(stderr,"new region %d, color %d, color (x,y+1) = %d, color (x+1,y+1) = %d\n",x,row[x],nextrow[x],nextrow[x < rowlen - 1 ? x + 1 : x]);
         regions[x].is_active = 1;
         regions[x].output = output+1;
         *output = (row[x] - (x > 0 ? row[x-1] : 0)) | 0x1;
@@ -116,7 +117,7 @@ unsigned char* encode_row(struct region* regions, int rowlen, unsigned char* out
         output = output + 2;
       } else {
         *output = row[x] - (x > 0 ? row[x-1] : 0);
-        fprintf(stderr,"zero-length region at %d, last color was %x, this color = %x, offset = %d\n",x,(x > 0 ? row[x - 1] : 0),row[x],*output);
+        //fprintf(stderr,"zero-length region at %d, last color was %x, this color = %x, offset = %d\n",x,(x > 0 ? row[x - 1] : 0),row[x],*output);
         output = output + 1;
         avg_area_num ++;
         avg_area_denom ++;
@@ -167,9 +168,13 @@ void encode_stream(FILE* in, gzFile out, int rowlen) {
   //read the first row into next_row to prime the whole process
   fread(next_row_buf,1,3*rowlen,in);
   int y = 0;
+  int last_read = 0;
   while(feof(in) == 0) {
     memcpy(this_row_buf,next_row_buf,3*rowlen);
-    fread(next_row_buf,1,3*rowlen,in);
+    last_read = fread(next_row_buf,1,3*rowlen,in);
+    if(last_read == 0) {
+      break;
+    }
     //encode the different components
     extract_red(this_row_buf,this_row,rowlen);
     extract_red(next_row_buf,next_row,rowlen);
@@ -214,12 +219,12 @@ void encode_stream(FILE* in, gzFile out, int rowlen) {
     y++;
   }
   //final row
-  extract_red(next_row_buf,next_row,rowlen);
-  output_cursor = encode_row(red_regions,rowlen,output_cursor,next_row,0);
-  extract_green(next_row_buf,next_row,rowlen);
-  output_cursor = encode_row(green_regions,rowlen,output_cursor,next_row,0);
-  extract_blue(next_row_buf,next_row,rowlen);
-  output_cursor = encode_row(blue_regions,rowlen,output_cursor,next_row,0);
+  extract_red(this_row_buf,this_row,rowlen);
+  output_cursor = encode_row(red_regions,rowlen,output_cursor,this_row,0);
+  extract_green(this_row_buf,this_row,rowlen);
+  output_cursor = encode_row(green_regions,rowlen,output_cursor,this_row,0);
+  extract_blue(this_row_buf,this_row,rowlen);
+  output_cursor = encode_row(blue_regions,rowlen,output_cursor,this_row,0);
   //finalize all regions that didn't get finalized
   for(int i = 0; i < rowlen; i++) {
     if(red_regions[i].is_active) {
@@ -233,7 +238,30 @@ void encode_stream(FILE* in, gzFile out, int rowlen) {
     }
   }
   //now 100% of our output should be writeable
+  if(output_begin > (output_cursor - output_buffer)) {
+    //write the extra bit
+    for(int i = output_begin; i < output_end;) {
+      if (output_buffer[i] & 0x1) {
+        output_buffer[i+1] &= 0x7f;
+        i += 2;
+      } else {
+        i++;
+      }
+    }
+    fprintf(stderr,"write of size %d to reset output_begin\n",output_end - output_begin);
+    gzwrite(out,output_buffer + output_begin,output_end - output_begin);
+    output_begin = 0;
+  }
+  //clear the 0x80 markers and write the last bit
   output_len = output_cursor - (output_buffer + output_begin);
+  for(int i = output_begin; i < output_len;) {
+    if (output_buffer[i] & 0x1) {
+      output_buffer[i+1] &= 0x7f;
+      i += 2;
+    } else {
+      i++;
+    }
+  }
   fprintf(stderr,"final write of size %d\n",output_len);
   gzwrite(out,output_buffer + output_begin,output_len);
   gzclose(out);
