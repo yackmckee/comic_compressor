@@ -72,10 +72,7 @@ void decode_stream(gzFile in, FILE* out) {
   struct region* regions_red = calloc(rowlen,sizeof(struct region));
   struct region* regions_green = calloc(rowlen,sizeof(struct region));
   struct region* regions_blue = calloc(rowlen,sizeof(struct region));
-  unsigned char* this_row_red = calloc(rowlen,1);
-  unsigned char* this_row_green = calloc(rowlen,1);
-  unsigned char* this_row_blue = calloc(rowlen,1);
-  unsigned char* this_row_mixed = calloc(rowlen*3,1);
+  unsigned char* this_row = calloc(rowlen*3,1);
   int y = 0;
   int input_incr = 2;// start with 2, so we get a fresh pair of inputs for the first go
   int output_incr = 1; 
@@ -91,7 +88,7 @@ void decode_stream(gzFile in, FILE* out) {
       } else if(output_incr == 0) { //handle incomplete reads. Probably impossible but whatever
         v2 = gzgetc(in);
       }
-      input_incr = decode_next(regions_red,rowlen,x,y,v1,v2,x == 0 ? 0 : this_row_red[x-1],this_row_red + x,&output_incr);
+      input_incr = decode_next(regions_red,rowlen,x,y,v1,v2,x == 0 ? 0 : this_row[3*x-3],this_row + 3*x,&output_incr);
       x += output_incr;
     }
     for(int x = 0; x < rowlen;) {
@@ -104,7 +101,7 @@ void decode_stream(gzFile in, FILE* out) {
       } else if(output_incr == 0) { //handle incomplete reads. Probably impossible but whatever
         v2 = gzgetc(in);
       }
-      input_incr = decode_next(regions_green,rowlen,x,y,v1,v2,x == 0 ? 0 : this_row_green[x-1],this_row_green + x,&output_incr);
+      input_incr = decode_next(regions_green,rowlen,x,y,v1,v2,x == 0 ? 0 : this_row[3*x-2],this_row + 3*x+1,&output_incr);
       x += output_incr;
     }
     for(int x = 0; x < rowlen;) {
@@ -117,27 +114,18 @@ void decode_stream(gzFile in, FILE* out) {
       } else if(output_incr == 0) { //handle incomplete reads. Probably impossible but whatever
         v2 = gzgetc(in);
       }
-      input_incr = decode_next(regions_blue,rowlen,x,y,v1,v2,x == 0 ? 0 : this_row_blue[x-1],this_row_blue + x,&output_incr);
+      input_incr = decode_next(regions_blue,rowlen,x,y,v1,v2,x == 0 ? 0 : this_row[3*x-1],this_row + 3*x + 2,&output_incr);
       x += output_incr;
-    }
-    //mix up the reds, greens, and blues for output
-    for(int i = 0; i < rowlen; i++) {
-      this_row_mixed[3*i] = this_row_red[i];
-      this_row_mixed[3*i + 1] = this_row_green[i];
-      this_row_mixed[3*i + 2] = this_row_blue[i];
     }
     //output
-    fwrite(this_row_mixed,1,rowlen*3,out);
-    fprintf(stderr,"finished row %d\n",y);
+    fwrite(this_row,1,rowlen*3,out);
+    //fprintf(stderr,"finished row %d\n",y);
     y++;
   }
   free(regions_red);
   free(regions_green);
   free(regions_blue);
-  free(this_row_red);
-  free(this_row_green);
-  free(this_row_blue);
-  free(this_row_mixed);
+  free(this_row);
 }
 
 int main(int argc,char** argv) {
