@@ -3,6 +3,8 @@
 #include <string.h>
 #include "zlib.h"
 
+#define min(a,b) ((a < b) ? a : b)
+
 typedef char bool;
 
 struct region {
@@ -21,15 +23,14 @@ unsigned char MASK = 0xfe;
 //to decode a value
 int decode_next(struct region* regions, int rowlen, int x, int y, unsigned char v1, unsigned char v2, unsigned char last_color, unsigned char* output, int* output_incr) {
   if (regions[x].is_active) { //if a region covers this location
-    //fprintf(stderr,"applying region with color %x at (%d,%d), l = %d, y0 = %d, x0 = %d\n",regions[x].color,x,y,regions[x].l,regions[x].y0,regions[x].x0);
-    *output = regions[x].color;
-    if (((x - regions[x].x0) == (y - regions[x].y0 - 1)) && (x < rowlen - 1)) {
-      regions[x + 1] = regions[x];
+    int ilim = min(y - regions[x].y0 + 1,rowlen-x);
+    for(int i = 0; i < ilim; i++) {
+      output[3*i] = regions[x].color;
     }
+    *output_incr = ilim;
     if(regions[x].l == (y - regions[x].y0)) {
       regions[x].is_active = 0;
     }
-    *output_incr = 1;
     return 0;
   } else { //if a region just expired or there was no active region
     if ((v1 & 0x1) && v2) { //if we are reading a nonzero-length region
