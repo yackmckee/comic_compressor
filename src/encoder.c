@@ -40,15 +40,7 @@ bool no_active_edge(int x, unsigned char this_color, struct region* regions) {
 //encodes one component of one row.
 //this is implemented as a macro so it takes up less space. Use encode_row_red, encode_row_green, etc.
 //diagnostics data has been commented out for speed
-#define encode_row(OFFSET) for(int x = OFFSET; x < rowlen*3; x+=3) { /*first we have to get rid of the low bit of every byte */ \
-    row[x] &= MASK; \
-  }\
-  if (nextrow != 0) {\
-    for(int x = OFFSET; x < rowlen*3; x+=3) { /*first we have to get rid of the low bit of every byte*/\
-      nextrow[x] &= MASK;\
-    }\
-  }\
-  for(int x = 0; x < rowlen;) {\
+#define encode_row(OFFSET) for(int x = 0; x < rowlen;) {\
     if (regions[x].is_active) { /*if this region is active, we need to see if it continues here or not*/\
       int i = x;\
       int imax = min(rowlen,x+regions[x].l+2);\
@@ -156,6 +148,9 @@ void encode_stream(FILE* in, gzFile out, int rowlen) {
   //fprintf(stderr,"output buffer is size %d\n",rowlen*256*6);
   //read the first row into next_row to prime the whole process
   fread(next_row_buf,1,3*rowlen,in);
+  for(int x = 0; x < rowlen*3;x++) {
+    next_row_buf[x] &= MASK;
+  }
   int y = 0;
   int last_read = 0;
   while(feof(in) == 0) {
@@ -163,6 +158,9 @@ void encode_stream(FILE* in, gzFile out, int rowlen) {
     this_row_buf = next_row_buf;
     next_row_buf = tmp;
     last_read = fread(next_row_buf,1,3*rowlen,in);
+    for(int x = 0; x < rowlen*3;x++) {
+      next_row_buf[x] &= MASK;
+    }
     if(last_read == 0) {
       break;
     }
